@@ -13,20 +13,35 @@ int main(){
         close(p2c[0]);
         close(c2p[1]);
 
-        write(p2c[1],&buf, 1);
+        if(write(p2c[1],&buf, 1) !=1 ){
+            fprintf(2,"parent write error\n");
+            exit(1);
+        }
 
-        read(c2p[0], &buf, 1);
-        printf("%d: received pong\n",getpid());
+        if(read(c2p[0], &buf, 1) != 1){
+            fprintf(2,"parent read error\n");
+            exit(1);
+        }
+        else printf("%d: received pong\n",getpid());
         wait(0);
+        exit(0);
     }
     else{
         // child read then write
         close(p2c[1]);
         close(c2p[0]);
 
-        read(p2c[0],&buf,1);
-        printf("%d: received ping\n",getpid());
-        write(c2p[1],&buf,1);
+        if(read(p2c[0],&buf,1) != 1){
+            fprintf(2,"child read error\n");
+            exit(1);
+        }
+        else printf("%d: received ping\n",getpid());
+        
+        if(write(c2p[1],&buf,1) != 1){
+            fprintf(2,"child write error\n");
+            exit(1);
+        }
+        exit(0);
     }
-    exit(0);
+
 }
