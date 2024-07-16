@@ -9,8 +9,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     int sleepNum = atoi(argv[1]);
-    printtf("(nothing happens for a little while)");
+    printf("(nothing happens for a little while)\n");
     sleep(sleepNum);
     exit(0);
-    return 0;
+
 }
