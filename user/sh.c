@@ -164,7 +164,9 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
+    // create child process
     if(fork1() == 0)
+      // child process executes program in shell
       runcmd(parsecmd(buf));
     wait(0);
   }
