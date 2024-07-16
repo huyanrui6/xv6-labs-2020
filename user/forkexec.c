@@ -9,7 +9,8 @@ int main(){
 
     if(pid == 0){
         char *argv[] = {"echo","THIS","IS","ECHO",0};
-        exec("echo", argv);
+        exec("echo", argv); // exec success
+        // exec("notecho", argv); // exec failed
         printf("echo failed\n");
         exit(1);
     }
@@ -18,4 +19,5 @@ int main(){
         wait(&status);
         printf("child exited with status %d\n",status);
     }
+    return 0;
 }
