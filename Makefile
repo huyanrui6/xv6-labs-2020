@@ -151,6 +151,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_copy\
 	$U/_open\
+	$U/_fork\
 
 
 ifeq ($(LAB),syscall)
