@@ -155,6 +155,7 @@ UPROGS=\
 	$U/_exec\
 	$U/_forkexec\
 	$U/_redirect\
+	$U/_pipe1\
 	$U/_sleep\
 	$U/_pingpong\
 	$U/_find\
