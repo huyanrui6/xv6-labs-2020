@@ -47,6 +47,8 @@ kvminit()
   kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 }
 
+// kvminithart: install kernel page table
+// write pa of root page table to register satp
 // Switch h/w page table register to the kernel's page table,
 // and enable paging.
 void
@@ -62,12 +64,13 @@ kvminithart()
 //
 // The risc-v Sv39 scheme has three levels of page-table
 // pages. A page-table page contains 512 64-bit PTEs.
-// A 64-bit virtual address is split into five fields:
+// A 64-bit virtual address is split into five fields: 25+27+12
 //   39..63 -- must be zero.
 //   30..38 -- 9 bits of level-2 index.
 //   21..29 -- 9 bits of level-1 index.
 //   12..20 -- 9 bits of level-0 index.
 //    0..11 -- 12 bits of byte offset within the page.
+// walk: given virtual addr to find PTE
 pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {

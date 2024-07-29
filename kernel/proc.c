@@ -32,8 +32,7 @@ procinit(void)
       initlock(&p->lock, "proc");
 
       // Allocate a page for the process's kernel stack.
-      // Map it high in memory, followed by an invalid
-      // guard page.
+      // Map it high in memory, followed by an invalid guard page.
       char *pa = kalloc();
       if(pa == 0)
         panic("kalloc");

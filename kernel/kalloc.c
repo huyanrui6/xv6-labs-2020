@@ -34,7 +34,10 @@ void
 freerange(void *pa_start, void *pa_end)
 {
   char *p;
+  // PGROUNDUP: free aligned pa (multiple 4096)
   p = (char*)PGROUNDUP((uint64)pa_start);
+
+  // per page kfree
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
 }
@@ -51,7 +54,7 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
+  // Fill with junk 1 to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
   r = (struct run*)pa;
