@@ -635,7 +635,7 @@ kill(int pid)
 }
 
 // Copy to either a user address, or kernel address,
-// depending on usr_dst.
+// depending on user_dst: 1 user 0 kernel.
 // Returns 0 on success, -1 on error.
 int
 either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
@@ -650,7 +650,7 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 }
 
 // Copy from either a user address, or kernel address,
-// depending on usr_src.
+// depending on user_src: 1 user 0 kernel.
 // Returns 0 on success, -1 on error.
 int
 either_copyin(void *dst, int user_src, uint64 src, uint64 len)

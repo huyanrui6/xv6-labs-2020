@@ -178,13 +178,15 @@ uartgetc(void)
   }
 }
 
-// handle a uart interrupt, raised because input has
-// arrived, or the uart is ready for more output, or
-// both. called from trap.c.
+// handle a uart interrupt, raised because input has arrived, 
+// or the uart is ready for more output, or both. 
+// called from trap.c.
 void
 uartintr(void)
 {
   // read and process incoming characters.
+  // uartintr reads any waiting input chars from UART and hands them to consoleintr.
+  // uartintr doesn’t wait for characters, since future input will raise a new interrupt.
   while(1){
     int c = uartgetc();
     if(c == -1)
