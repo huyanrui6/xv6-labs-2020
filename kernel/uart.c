@@ -80,13 +80,12 @@ uartinit(void)
 // add a character to the output buffer and tell the
 // UART to start sending if it isn't already.
 // blocks if the output buffer is full.
-// because it may block, it can't be called
-// from interrupts; it's only suitable for use
-// by write().
+// because it may block, it can't be called from interrupts; 
+// it's only suitable for use by write().
 void
 uartputc(int c)
 {
-  acquire(&uart_tx_lock);
+  acquire(&uart_tx_lock); // ensure thread safe
 
   if(panicked){
     for(;;)
@@ -108,32 +107,35 @@ uartputc(int c)
   }
 }
 
-// alternate version of uartputc() that doesn't 
-// use interrupts, for use by kernel printf() and
-// to echo characters. it spins waiting for the uart's
-// output register to be empty.
+// synchronous version of uartputc() that doesn't use interrupts,
+// for use by kernel printf() and to echo characters(send immediately). 
+// it spins waiting for the uart's output register to be empty.
 void
 uartputc_sync(int c)
 {
-  push_off();
+  push_off(); // disable interrupt -> ensure atomic
 
+  // if system is panic -> infinite loop
+  // when crash, no futher operations to avoid damage
   if(panicked){
     for(;;)
       ;
   }
 
   // wait for Transmit Holding Empty to be set in LSR.
+  // LSR_TX_IDLE == 0 indicating THR is not idle
   while((ReadReg(LSR) & LSR_TX_IDLE) == 0)
     ;
   WriteReg(THR, c);
 
-  pop_off();
+  pop_off();// enable interrupt
 }
 
 // if the UART is idle, and a character is waiting
 // in the transmit buffer, send it.
 // caller must hold uart_tx_lock.
-// called from both the top- and bottom-half.
+// called from both the top-(main execution flow) and bottom-half (interrupt service routines).
+// send characters from a transmit buffer when the UART is ready
 void
 uartstart()
 {
@@ -152,11 +154,14 @@ uartstart()
     
     int c = uart_tx_buf[uart_tx_r];
     uart_tx_r = (uart_tx_r + 1) % UART_TX_BUF_SIZE;
+    // Retrieves a character c from the transmit buffer at the uart_tx_r index.
+    // uart_tx_r to the next position(+1), wrapping around if necessary using modulo %
     
     // maybe uartputc() is waiting for space in the buffer.
     wakeup(&uart_tx_r);
     
     WriteReg(THR, c);
+    // writes the character c to the Transmit Holding Register (THR)
   }
 }
 
