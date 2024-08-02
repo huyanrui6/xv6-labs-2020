@@ -1,3 +1,5 @@
+// function declarations 函数声明
+
 struct buf;
 struct context;
 struct file;

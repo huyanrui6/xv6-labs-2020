@@ -117,5 +117,5 @@ timervec:
         ld a2, 8(a0)
         ld a1, 0(a0)
         csrrw a0, mscratch, a0
-
+        # restore registers and return
         mret
