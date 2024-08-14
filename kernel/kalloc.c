@@ -11,13 +11,16 @@
 
 void freerange(void *pa_start, void *pa_end);
 
-extern char end[]; // first address after kernel.
+extern char end[]; // first address after kernel. the end of kernel
                    // defined by kernel.ld.
 
+
+// freelist
 struct run {
   struct run *next;
 };
 
+// spinlock protects the freelist
 struct {
   struct spinlock lock;
   struct run *freelist;

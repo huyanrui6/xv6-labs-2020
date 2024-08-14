@@ -21,7 +21,7 @@ extern char trampoline[]; // trampoline.S
 void
 kvminit()
 {
-  kernel_pagetable = (pagetable_t) kalloc();
+  kernel_pagetable = (pagetable_t) kalloc();// allocate physical page
   memset(kernel_pagetable, 0, PGSIZE);
 
   // uart registers
@@ -51,6 +51,7 @@ kvminit()
 // write pa of root page table to register satp
 // Switch h/w page table register to the kernel's page table,
 // and enable paging.
+// 这条指令之前使用物理内存地址，这条指令之后page table生效，虚拟内存地址
 void
 kvminithart()
 {
@@ -114,9 +115,10 @@ walkaddr(pagetable_t pagetable, uint64 va)
   return pa;
 }
 
-// add a mapping to the kernel page table.
+// map IO devices to the kernel page table.
 // only used when booting.
 // does not flush TLB or enable paging.
+// call mappages
 void
 kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 {
