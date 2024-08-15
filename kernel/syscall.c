@@ -104,7 +104,11 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);
 
+//用 extern 全局声明新的内核调用函数，并且在 syscalls 映射表中加入编号到系统调用函数指针的映射
+
+//syscalls数组是一个函数指针表: 系统调用号与系统调用处理函数的映射表
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
@@ -127,18 +131,55 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_trace]   sys_trace,
 };
 
+// syscall_names[num]: 从 syscall 编号到 syscall 名的映射表
+static char *syscall_names[] = {
+[SYS_fork]    "fork",
+[SYS_exit]    "exit",
+[SYS_wait]    "wait",
+[SYS_pipe]    "pipe",
+[SYS_read]    "read",
+[SYS_kill]    "kill",
+[SYS_exec]    "exec",
+[SYS_fstat]   "fstat",
+[SYS_chdir]   "chdir",
+[SYS_dup]     "dup",
+[SYS_getpid]  "getpid",
+[SYS_sbrk]    "sbrk",
+[SYS_sleep]   "sleep",
+[SYS_uptime]  "uptime",
+[SYS_open]    "open",
+[SYS_write]   "write",
+[SYS_mknod]   "mknod",
+[SYS_unlink]  "unlink",
+[SYS_link]    "link",
+[SYS_mkdir]   "mkdir",
+[SYS_close]   "close",
+[SYS_trace]   "trace",
+};
+
+/* 用户程序调用了一个系统调用，系统调用号存入a7寄存器。
+在内核中，syscall() 函数通过 p->trapframe->a7 读取系统调用号 验证系统调用号的有效性。
+if 系统调用号有效且有对应的系统调用处理函数，就调用该函数，并将返回值存储在 a0 中
+else 系统调用号无效（例如未实现的系统调用），内核会打印错误并返回 -1。*/
 void
 syscall(void)
 {
   int num;
   struct proc *p = myproc();
 
-  num = p->trapframe->a7;
+  num = p->trapframe->a7;// get syscall num 系统调用编号，参见书中4.3节
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    p->trapframe->a0 = syscalls[num]();
-  } else {
+    p->trapframe->a0 = syscalls[num](); // 执行系统调用，然后将返回值存入a0. RISC-V上的C调用约定将返回值放在a0中
+    // 如果当前进程设置了对该编号系统调用的 trace，则打出 pid、系统调用名称和返回值
+    if((p->trace_mask >> num) & 1) {
+      printf("%d: syscall %s -> %d\n",p->pid, syscall_names[num], p->trapframe->a0); 
+    }
+    
+  } 
+  else { //系统调用号无效，syscall打印错误并返回-1。
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
     p->trapframe->a0 = -1;

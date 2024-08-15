@@ -28,6 +28,7 @@ struct cpu {
 
 extern struct cpu cpus[NCPU];
 
+// trapframe 是当前进程的陷阱帧，保存了系统调用或中断发生时的寄存器状态。
 // per-process data for the trap handling code in trampoline.S.
 // sits in a page by itself just under the trampoline page in the
 // user page table. not specially mapped in the kernel page table.
@@ -103,4 +104,6 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  int trace_mask;              // trace系统调用参数
 };

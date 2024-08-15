@@ -95,3 +95,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
+uint64
+sys_trace(void)
+{
+  argint(0, &(myproc()->trace_mask)); // 获取系统调用的参数
+  return 0;
+}

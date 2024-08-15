@@ -84,14 +84,20 @@ stat(const char *n, struct stat *st)
   return r;
 }
 
+// ASCII to integer 将纯数字字符串转化为整数
 int
 atoi(const char *s)
 {
   int n;
 
   n = 0;
+  // '0' 和 '9' 之间 *s 是一个数字字符
   while('0' <= *s && *s <= '9')
     n = n*10 + *s++ - '0';
+    // 将当前的数字字符转化为整数并累加到 n 中。n * 10 是为了为新添加的数字腾出位置（左移一位）
+    // *s 是当前字符的 ASCII，例如字符 '3' 的 ASCII 值是 51，而字符 '0' 的 ASCII 值是 48。
+    // *s - '0' 就将字符转换为了对应的数字。例如，'3' - '0' 的结果是 3。
+    //*s++ 将字符指针 s 向后移动一位，以处理下一个字符
   return n;
 }
 
