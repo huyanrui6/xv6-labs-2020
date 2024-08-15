@@ -31,6 +31,7 @@ fetchstr(uint64 addr, char *buf, int max)
   return strlen(buf);
 }
 
+// p->trapframe->an n=[0,5]
 static uint64
 argraw(int n)
 {
@@ -62,6 +63,7 @@ argint(int n, int *ip)
 }
 
 // Retrieve an argument as a pointer.
+// From p->trapframe->an to ip
 // Doesn't check for legality, since
 // copyin/copyout will do that.
 int
@@ -105,6 +107,7 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
 
 //用 extern 全局声明新的内核调用函数，并且在 syscalls 映射表中加入编号到系统调用函数指针的映射
 
@@ -132,6 +135,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
 };
 
 // syscall_names[num]: 从 syscall 编号到 syscall 名的映射表
@@ -158,6 +162,7 @@ static char *syscall_names[] = {
 [SYS_mkdir]   "mkdir",
 [SYS_close]   "close",
 [SYS_trace]   "trace",
+[SYS_sysinfo] "sysinfo",
 };
 
 /* 用户程序调用了一个系统调用，系统调用号存入a7寄存器。

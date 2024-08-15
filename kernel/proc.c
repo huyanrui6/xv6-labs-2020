@@ -698,3 +698,18 @@ procdump(void)
     printf("\n");
   }
 }
+
+// 新增函数procnum，获取可用进程数
+uint64
+procnum(void)
+{
+  uint64 num = 0;
+  struct proc *p;
+  // 不需要acquire(&p->lock)，因为我们只需要读取进程列表，不需要写
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state != UNUSED){ // 不是 UNUSED 的进程位，就是已经分配的
+      num++;
+    }
+  }
+  return num;
+}

@@ -71,12 +71,29 @@ kalloc(void)
   struct run *r;
 
   acquire(&kmem.lock);
-  r = kmem.freelist;
+  r = kmem.freelist; // 获得空闲链表的根节点
   if(r)
-    kmem.freelist = r->next;
+    kmem.freelist = r->next; // update freelist (remove r)
   release(&kmem.lock);
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+// kernel/kalloc.c 新增函数freemem_size，获取空闲内存数量
+// 内存是使用链表进行管理的，因此遍历kmem.freelist就能够获取所有的空闲内存
+uint64
+freemem_size(void)
+{
+  struct run *r;
+  int num = 0;
+  acquire(&kmem.lock);
+  r = kmem.freelist;
+  while(r){
+    num ++;
+    r = r->next;
+  }
+  release(&kmem.lock);
+  return num * PGSIZE;  
 }

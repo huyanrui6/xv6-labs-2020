@@ -37,7 +37,9 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
-entry("trace"); #在 usys.pl 中，加入用户态到内核态的跳板函数。
+entry("trace"); 
+entry("sysinfo");
+#在 usys.pl 中，加入用户态到内核态的跳板函数。
 
 # usys.S 汇编文件
 # trace:		    # 定义用户态跳板函数
