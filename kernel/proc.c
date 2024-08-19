@@ -121,6 +121,25 @@ found:
     return 0;
   }
 
+  // allocproc 调用 proc_kpt_init()
+  // init the kernel page table
+  p->kernelpt = proc_kpt_init();
+  if(p->kernelpt == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // 分配一个物理页，作为新进程的内核栈使用 (copy from procinit)
+  // Allocate a page for the process's kernel stack.
+  // Map it high in memory, followed by an invalid guard page.
+  char *pa = kalloc();
+  if(pa == 0)
+    panic("kalloc");
+  uint64 va = KSTACK((int) (p - proc));
+  uvmmap(p->kernelpt, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va;
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -142,6 +161,12 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  // free process kernel stack
+  uvmunmap(p->kernelpt, p->kstack, 1, 1);
+  p->kstack = 0;
+  // 递归释放进程独享的页表
+  proc_freekernelpt(p->kernelpt);
+  p->kernelpt = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -195,6 +220,27 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmfree(pagetable, sz);
 }
 
+// 释放进程的内核页表:
+// 遍历整个内核页表，将所有有效的页表项清空为零
+// 如果这个页表项不在最后一层的页表上，需要递归
+void
+proc_freekernelpt(pagetable_t kernelpt)
+{
+  // similar to freewalk / _vmprint
+  for(int i = 0; i < 512; i++){
+    pte_t pte = kernelpt[i];
+    if(pte & PTE_V){
+      kernelpt[i] = 0;
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        // if pte -> lower level pte / non leaf pte: recursive
+        uint64 child = PTE2PA(pte);
+        proc_freekernelpt((pagetable_t)child);
+      }
+    }
+  }
+  kfree((void*)kernelpt);
+}
+
 // a user program that calls exec("/init")
 // od -t xC initcode
 uchar initcode[] = {
@@ -220,6 +266,8 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  // 同步程序内存映射到进程内核页表中
+  u2kvmcopy(p->pagetable, p->kernelpt, 0, p->sz);
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -243,9 +291,15 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
+    // 加上PLIC限制
+    if(PGROUNDUP(sz + n) >= PLIC){
+      return -1;
+    }
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    // 复制一份到内核页表
+    u2kvmcopy(p->pagetable, p->kernelpt, sz - n, sz);
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
@@ -279,6 +333,9 @@ fork(void)
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
+
+  // 复制到新进程的内核页表
+  u2kvmcopy(np->pagetable, np->kernelpt, 0, np->sz);
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
@@ -473,7 +530,14 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        // proc kernel page table -> SATP
+        proc_inithart(p->kernelpt);
+
         swtch(&c->context, &p->context);
+
+        // come back to global kernel page table
+        kvminithart();
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
