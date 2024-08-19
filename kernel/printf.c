@@ -132,3 +132,20 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+// 提示：返回地址位于栈帧帧指针的固定偏移(-8)位置，ra = fp - 8
+// 保存的帧指针位于帧指针的固定偏移(-16)位置 fp = fp -16
+void
+backtrace(){
+  printf("backtrace:\n");
+  uint64 fp = r_fp(); // 读取当前帧指针 frame pointer
+
+  // 判断当前的fp是否被分配了一个页面来终止循环
+  while(PGROUNDUP(fp) - PGROUNDDOWN(fp) == PGSIZE){ // 如果已经到达栈底
+    // 返回地址保存在-8偏移的位置
+    uint64 ra = *(uint64*)(fp - 8); // return address
+    printf("%p\n", ra);
+    // 前一个帧指针保存在-16偏移的位置
+    fp = *(uint64*)(fp - 16); // previous fp
+  }
+}

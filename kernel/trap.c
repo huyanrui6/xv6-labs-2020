@@ -66,7 +66,15 @@ usertrap(void)
 
     syscall();
   } else if((which_dev = devintr()) != 0){
-    // ok
+    // test 0
+    // manipulate a process's alarm ticks if there's a timer interrupt
+    // if(which_dev == 2){
+    //   p->tickscount = p->tickscount +1;
+    //   if(p->tickscount == p->interval){
+    //     p->tickscount = 0;
+    //     p->trapframe->epc = (uint64)p->handler;
+    //   }
+    // }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
@@ -77,9 +85,20 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    // 如果设定了时钟事件    如果已经到达或超过设定的 tick 数    确保没有时钟正在运行
+    if(p->interval!=0 && ++p->tickscount==p->interval && p->is_alarming==0){
+      // 保存进程陷阱帧p->trapframe到p->alarm_trapframe
+      memmove(p->alarm_trapframe, p->trapframe, sizeof(struct trapframe));  // backup trapframe
+      // 更改陷阱帧中保留的程序计数器，注意一定要在保存寄存器内容后再设置epc
+      // 将程序流转跳到 alarm_handler 中，handler 执行完毕后再恢复原本的执行流
+      p->trapframe->epc = (uint64)p->handler;
+      p->tickscount = 0;
+      p->is_alarming = 1;
+    }
+    // 如果一个时钟到期的时候已经有一个时钟处理函数正在运行，则会推迟到原处理函数运行完成后的下一个 tick 才触发这次时钟
     yield();
-
+  }
   usertrapret();
 }
 

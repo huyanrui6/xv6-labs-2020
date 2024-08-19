@@ -311,6 +311,16 @@ r_ra()
   return x;
 }
 
+// add read frame pointer function fp <- s0
+// GCC compiler stores the frame pointer in the register s0
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+
 // flush the TLB.
 static inline void
 sfence_vma()

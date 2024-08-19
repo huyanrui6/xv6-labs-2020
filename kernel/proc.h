@@ -103,4 +103,9 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint64 interval;             // 报警间隔 alarm interval 时钟周期，0 为禁用
+  void (*handler)();           // 报警处理函数 handler function pointer
+  uint64 tickscount;           // 两次报警间的滴答计数
+  struct trapframe* alarm_trapframe; // 用于中断处理完成后恢复原程序的正常执行
+  int is_alarming;             // 是否正在执行handler且还未返回  prevent re-entrance of handler
 };
