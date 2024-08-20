@@ -14,6 +14,8 @@ r_mhartid()
 #define MSTATUS_MPP_S (1L << 11)
 #define MSTATUS_MPP_U (0L << 11)
 #define MSTATUS_MIE (1L << 3)    // machine-mode interrupt enable.
+// 记录应用了COW策略后fork的页面
+#define PTE_F (1L << 8)
 
 static inline uint64
 r_mstatus()
