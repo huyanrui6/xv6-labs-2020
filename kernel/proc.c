@@ -514,6 +514,9 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
+  // 函数会将当前寄存器中的值保存到p->context中，
+  // 并将当前cpu中context的内容恢复到寄存器中，
+  // 其中最重要的就是ra寄存器，当恢复了这个后，ra的值对应的地址在调度器scheduler()中
   swtch(&p->context, &mycpu()->context);
   mycpu()->intena = intena;
 }

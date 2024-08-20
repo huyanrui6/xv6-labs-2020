@@ -45,6 +45,9 @@ char uart_tx_buf[UART_TX_BUF_SIZE];
 int uart_tx_w; // write next to uart_tx_buf[uart_tx_w++]
 int uart_tx_r; // read next from uart_tx_buf[uar_tx_r++]
 
+// 从读指针到写指针之间的字符是要显示的字符，UART会逐次的将读指针指向的字符在显示器上显示，同时printf可能又会将新的字符写入到缓存。
+// 读指针总是会落后于写指针直到读指针追上了写指针，这时两个指针相同，并且此时缓存中没有字符需要显示。
+
 extern volatile int panicked; // from printf.c
 
 void uartstart();
@@ -81,12 +84,12 @@ uartinit(void)
 // UART to start sending if it isn't already.
 // blocks if the output buffer is full.
 // because it may block, it can't be called
-// from interrupts; it's only suitable for use
-// by write().
+// from interrupts; it's only suitable for use by write().
+// 函数首先获得了锁，然后查看当前缓存是否还有空槽位，如果有的话将数据放置于空槽位中；写指针加1；调用uartstart；最后释放锁
 void
 uartputc(int c)
 {
-  acquire(&uart_tx_lock);
+  acquire(&uart_tx_lock); //函数首先获得锁
 
   if(panicked){
     for(;;)
@@ -94,11 +97,13 @@ uartputc(int c)
   }
 
   while(1){
-    if(((uart_tx_w + 1) % UART_TX_BUF_SIZE) == uart_tx_r){
+    if(((uart_tx_w + 1) % UART_TX_BUF_SIZE) == uart_tx_r){ //查看当前缓存是否还有空槽位
       // buffer is full.
       // wait for uartstart() to open up space in the buffer.
       sleep(&uart_tx_r, &uart_tx_lock);
-    } else {
+    } 
+    // 如果有的话将数据放置于空槽位中；写指针加1
+    else {
       uart_tx_buf[uart_tx_w] = c;
       uart_tx_w = (uart_tx_w + 1) % UART_TX_BUF_SIZE;
       uartstart();
@@ -134,6 +139,7 @@ uartputc_sync(int c)
 // in the transmit buffer, send it.
 // caller must hold uart_tx_lock.
 // called from both the top- and bottom-half.
+// 锁确保了硬件寄存器THR只有一个写入者
 void
 uartstart()
 {
@@ -176,6 +182,7 @@ uartgetc(void)
 // handle a uart interrupt, raised because input has
 // arrived, or the uart is ready for more output, or
 // both. called from trap.c.
+// 中断处理程序也需要获取锁
 void
 uartintr(void)
 {
