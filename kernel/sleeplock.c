@@ -18,6 +18,8 @@ initsleeplock(struct sleeplock *lk, char *name)
   lk->pid = 0;
 }
 
+// sleep lock的优势: 持有锁时不关中断 等待锁时不会空转
+// 如果sleep lock被持有，那么就进入sleep状态，并将自己从当前CPU调度开
 void
 acquiresleep(struct sleeplock *lk)
 {

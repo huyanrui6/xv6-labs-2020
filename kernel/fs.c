@@ -200,11 +200,11 @@ ialloc(uint dev, short type)
   struct dinode *dip;
 
   for(inum = 1; inum < sb.ninodes; inum++){
-    bp = bread(dev, IBLOCK(inum, sb));
+    bp = bread(dev, IBLOCK(inum, sb));// 找到inode所在的block
     dip = (struct dinode*)bp->data + inum%IPB;
     if(dip->type == 0){  // a free inode
       memset(dip, 0, sizeof(*dip));
-      dip->type = type;
+      dip->type = type; // 将inode标记为已被分配
       log_write(bp);   // mark it allocated on the disk
       brelse(bp);
       return iget(dev, inum);

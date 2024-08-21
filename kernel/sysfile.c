@@ -2,6 +2,7 @@
 // File-system system calls.
 // Mostly argument checking, since we don't trust
 // user code, and calls into file.c and fs.c.
+// sysfile.c中包含了所有与文件系统相关的函数
 //
 
 #include "types.h"
@@ -238,6 +239,8 @@ bad:
   return -1;
 }
 
+// create函数中首先会解析路径名并找到最后一个目录，之后会查看文件是否存在，如果存在的话会返回错误。
+// 之后就会调用ialloc（inode allocate），这个函数会为文件x分配inode
 static struct inode*
 create(char *path, short type, short major, short minor)
 {
@@ -283,6 +286,7 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+// 分配inode发生在sys_open函数中，这个函数会负责创建文件 调用create函数
 uint64
 sys_open(void)
 {
