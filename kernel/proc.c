@@ -123,6 +123,9 @@ found:
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
+  // 因为进程需要有自己的栈，所以ra和sp都被设置了
+  // forkret函数就是进程的第一次调用swtch函数会切换到的“另一个”线程位置
+  // 从switch返回就直接跳到了forkret的最开始位置 只会在启动进程的时候以这种奇怪的方式运行
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
@@ -133,9 +136,12 @@ found:
 // free a proc structure and the data hanging from it,
 // including user pages.
 // p->lock must be held.
+// 这是关闭一个进程的最后一些步骤。不是退出的进程自己在exit函数中执行这些步骤
+// 由父进程wait调用的freeproc函数，来完成释放进程资源的最后几个步骤
 static void
 freeproc(struct proc *p)
 {
+  // 如果我们需要释放进程内核栈，那么也应该在这里释放。但是因为内核栈的guard page，我们没有必要再释放一次内核栈
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -150,6 +156,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  // 当父进程完成了清理进程的所有资源，子进程的状态会被设置成UNUSED
 }
 
 // Create a user page table for a given process,
@@ -334,7 +341,7 @@ exit(int status)
 {
   struct proc *p = myproc();
 
-  if(p == initproc)
+  if(p == initproc) // exit的进程是init进程，会触发panic
     panic("init exiting");
 
   // Close all open files.
@@ -346,6 +353,8 @@ exit(int status)
     }
   }
 
+  // 进程有一个对于当前目录的记录，这个记录会随着你执行cd指令而改变。
+  // 在exit过程中也需要将对这个目录的引用释放给文件系统
   begin_op();
   iput(p->cwd);
   end_op();
@@ -366,6 +375,8 @@ exit(int status)
   // exiting parent, but the result will be a harmless spurious wakeup
   // to a dead or wrong process; proc structs are never re-allocated
   // as anything else.
+  // 为什么需要在重新设置父进程之前，先获取当前进程的父进程？
+  // 防止一个进程和它的父进程同时退出。
   acquire(&p->lock);
   struct proc *original_parent = p->parent;
   release(&p->lock);
@@ -376,7 +387,8 @@ exit(int status)
 
   acquire(&p->lock);
 
-  // Give any children to init.
+  // Give any children to init. 设置子进程的父进程为init进程
+  // init进程的工作就是在一个循环中不停调用wait
   reparent(p);
 
   // Parent might be sleeping in wait().
@@ -387,6 +399,9 @@ exit(int status)
 
   release(&original_parent->lock);
 
+  // 到目前位置，进程的状态是ZOMBIE，不会再运行，因为调度器只会运行RUNNABLE进程。
+  // 同时进程资源也并没有完全释放(by parent wait freeproc)，释放了进程的状态应该是UNUSED。
+
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
@@ -394,6 +409,7 @@ exit(int status)
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
+// 如果一个进程exit了，并且它的父进程调用了wait系统调用，父进程的wait会返回
 int
 wait(uint64 addr)
 {
@@ -407,6 +423,8 @@ wait(uint64 addr)
 
   for(;;){
     // Scan through table looking for exited children.
+    // 扫描进程表单，找到父进程是自己且状态是ZOMBIE的进程
+    // 进程已经在exit函数中几乎要执行完了。之后由父进程调用的freeproc函数，来完成释放进程资源的最后几个步骤
     havekids = 0;
     for(np = proc; np < &proc[NPROC]; np++){
       // this code uses np->parent without holding np->lock.
@@ -426,7 +444,7 @@ wait(uint64 addr)
             release(&p->lock);
             return -1;
           }
-          freeproc(np);
+          freeproc(np); // 父进程调用freeproc函数，并清理进程的资源
           release(&np->lock);
           release(&p->lock);
           return pid;
@@ -453,6 +471,7 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+// 死循环 开中断 遍历p 获取锁 找就绪 改运行 swtch 释放锁
 void
 scheduler(void)
 {
@@ -460,29 +479,29 @@ scheduler(void)
   struct cpu *c = mycpu();
   
   c->proc = 0;
-  for(;;){
+  for(;;){ //死循环
     // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
+    intr_on(); //开中断
     
     int nproc = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
+    for(p = proc; p < &proc[NPROC]; p++) { //遍历p
+      acquire(&p->lock); //获取锁 确保了步骤的原子性
       if(p->state != UNUSED) {
         nproc++;
       }
-      if(p->state == RUNNABLE) {
+      if(p->state == RUNNABLE) { //找就绪
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
-        p->state = RUNNING;
+        p->state = RUNNING; //改运行
         c->proc = p;
-        swtch(&c->context, &p->context);
+        swtch(&c->context, &p->context); //swtch
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
-      release(&p->lock);
+      release(&p->lock); //释放锁
     }
     if(nproc <= 2) {   // only init and sh exist
       intr_on();
@@ -498,6 +517,9 @@ scheduler(void)
 // be proc->intena and proc->noff, but that would
 // break in the few places where a lock is held but
 // there's no process.
+// sched函数基本没有干任何事情，只是做了一些合理性检查，如果发现异常就panic
+// 底部的swtch函数 switch.s
+// XV6禁止在调用switch函数时，获取除了p->lock以外的其他锁
 void
 sched(void)
 {
@@ -514,9 +536,12 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
-  // 函数会将当前寄存器中的值保存到p->context中，
+  // 函数会将当前内核线程寄存器中保存到p->context中，
   // 并将当前cpu中context的内容恢复到寄存器中，
+  // CPU结构体中的context保存了当前CPU核的调度器线程的寄存器
   // 其中最重要的就是ra寄存器，当恢复了这个后，ra的值对应的地址在调度器scheduler()中
+  // 所以swtch函数在保存完当前内核线程的内核寄存器之后，就会恢复当前CPU核的调度器线程的寄存器，并继续执行当前CPU核的调度器线程。
+  // save kthread reg to p->context, restore scheduler reg from c->context, run scheduler thread
   swtch(&p->context, &mycpu()->context);
   mycpu()->intena = intena;
 }
@@ -546,6 +571,7 @@ forkret(void)
     // File system initialization must be run in the context of a
     // regular process (e.g., because it calls sleep), and thus cannot
     // be run from main().
+    // 初始化文件系统需要等到我们有了一个进程才能进行。而这一步是在第一次调用forkret时完成的
     first = 0;
     fsinit(ROOTDEV);
   }
@@ -555,6 +581,9 @@ forkret(void)
 
 // Atomically release lock and sleep on chan.
 // Reacquires lock when awakened.
+// 调用sleep函数的时候需要对condition lock上锁
+// 在sleep函数内部会对condition lock解锁
+// sleep函数返回时会重新对condition lock上锁
 void
 sleep(void *chan, struct spinlock *lk)
 {
@@ -566,6 +595,8 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
+  // 在release锁之前，sleep会获取即将进入SLEEPING状态的进程的锁
+  // sleep函数只有在获取到进程的锁p->lock之后，才能释放condition lock
   if(lk != &p->lock){  //DOC: sleeplock0
     acquire(&p->lock);  //DOC: sleeplock1
     release(lk);
@@ -575,12 +606,16 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
 
-  sched();
+  sched(); // swtch to scheduler 调度器线程中会释放前一个进程的锁
+
+  // 调度器线程释放进程锁之后，wakeup才能终于获取进程的锁，发现它正在SLEEPING状态，并唤醒它
+  // wakeup需要同时持有两个锁才能查看进程 solve lost wakeup problem
 
   // Tidy up.
   p->chan = 0;
 
   // Reacquire original lock.
+  // sleep函数中最后一件事情就是重新获取condition lock
   if(lk != &p->lock){
     release(&p->lock);
     acquire(lk);
@@ -589,6 +624,7 @@ sleep(void *chan, struct spinlock *lk)
 
 // Wake up all processes sleeping on chan.
 // Must be called without any p->lock.
+// 遍历p 获取锁 找睡眠 改就绪 释放锁
 void
 wakeup(void *chan)
 {
@@ -618,6 +654,12 @@ wakeup1(struct proc *p)
 // Kill the process with the given pid.
 // The victim won't exit until it tries to return
 // to user space (see usertrap() in trap.c).
+// kill系统调用不能直接停止目标进程的运行。
+// 实际上，在XV6和其他的Unix系统中，kill系统调用基本上不做任何事情
+// 遍历p 获取锁 找到p 改状态 释放锁
+// 目标进程运行到内核代码中能安全停止运行的位置时，会检查自己的killed标志位，
+// 如果设置为1，目标进程会自愿的执行exit系统调用。
+// 你可以在trap.c中看到所有可以安全停止运行的位置
 int
 kill(int pid)
 {

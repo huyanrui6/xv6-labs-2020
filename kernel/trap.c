@@ -204,7 +204,7 @@ devintr()
     // software interrupt from a machine-mode timer interrupt,
     // forwarded by timervec in kernelvec.S.
 
-    if(cpuid() == 0){
+    if(cpuid() == 0){ // 这一行会识别出当前是在响应定时器中断
       clockintr();
     }
     

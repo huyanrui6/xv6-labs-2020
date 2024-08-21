@@ -35,7 +35,7 @@ main(void)
       printf("init: exec sh failed\n");
       exit(1);
     }
-
+    // init就是在一个循环中不停的调用wait init进程不允许退出
     for(;;){
       // this call to wait() returns if the shell exits,
       // or if a parentless process exits.

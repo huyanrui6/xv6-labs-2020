@@ -183,6 +183,7 @@ uartgetc(void)
 // arrived, or the uart is ready for more output, or
 // both. called from trap.c.
 // 中断处理程序也需要获取锁
+// 这个中断处理程序会在UART硬件触发中断时由trap.c代码调用
 void
 uartintr(void)
 {

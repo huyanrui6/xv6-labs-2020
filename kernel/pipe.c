@@ -107,6 +107,8 @@ piperead(struct pipe *pi, uint64 addr, int n)
   char ch;
 
   acquire(&pi->lock);
+  // 对于SLEEPING状态的进程，如果它被kill了，它会被直接唤醒RUNNABLE，
+  // 包装了sleep的循环会检查进程的killed标志位，最后再调用exit
   while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
     if(pr->killed){
       release(&pi->lock);

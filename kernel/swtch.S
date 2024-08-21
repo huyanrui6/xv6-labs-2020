@@ -3,6 +3,10 @@
 #   void swtch(struct context *old, struct context *new);
 # 
 # Save current registers in old. Load from new.	
+# 函数中上半部分是将当前的寄存器保存在当前线程对应的context对象中，sd
+# 函数的下半部分是将调度器线程的寄存器，也就是我们将要切换到的线程的寄存器恢复到CPU的寄存器中。ld
+# 之后函数就返回了 ret
+# 调用switch函数的过程中，必须要持有p->lock，但是又不能持有任何其他的锁
 
 
 .globl swtch

@@ -269,6 +269,9 @@ virtio_disk_rw(struct buf *b, int write)
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
 
   // Wait for virtio_disk_intr() to say request has finished.
+  // 进程在SLEEPING状态中被kill了不直接退出:
+  // 例如，一个进程正在更新一个文件系统并创建一个文件的过程中，进程不适宜在这个时间点退出，因为我们想要完成文件系统的操作，之后进程才能退出。
+  // 磁盘驱动中的sleep循环，没有检查进程的killed标志位
   while(b->disk == 1) {
     sleep(b, &disk.vdisk_lock);
   }
