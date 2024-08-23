@@ -1,4 +1,5 @@
 // Saved registers for kernel context switches.
+// total 14 = ra + sp + callee-saved regs s0 - s11
 struct context {
   uint64 ra;
   uint64 sp;
@@ -18,11 +19,12 @@ struct context {
   uint64 s11;
 };
 
+// CPU的hartid在内核中存储在该CPU的tp寄存器中
 // Per-CPU state.
 struct cpu {
-  struct proc *proc;          // The process running on this cpu, or null.
-  struct context context;     // swtch() here to enter scheduler().
-  int noff;                   // Depth of push_off() nesting.
+  struct proc *proc;          // The process running on this cpu, or null. 当前在该CPU上运行的进程
+  struct context context;     // swtch() here to enter scheduler(). CPU的调度线程保存寄存器
+  int noff;                   // Depth of push_off() nesting. 管理中断禁用所需的嵌套自旋锁的计数
   int intena;                 // Were interrupts enabled before push_off()?
 };
 

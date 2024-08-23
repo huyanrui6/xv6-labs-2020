@@ -64,6 +64,7 @@ mycpu(void) {
 }
 
 // Return the current struct proc *, or zero if none.
+// myproc()禁用中断，调用mycpu，从struct cpu中取出当前进程指针（c->proc），然后启用中断
 struct proc*
 myproc(void) {
   push_off();
@@ -597,6 +598,7 @@ sleep(void *chan, struct spinlock *lk)
   // so it's okay to release lk.
   // 在release锁之前，sleep会获取即将进入SLEEPING状态的进程的锁
   // sleep函数只有在获取到进程的锁p->lock之后，才能释放condition lock
+  // 获取进程锁 释放条件锁
   if(lk != &p->lock){  //DOC: sleeplock0
     acquire(&p->lock);  //DOC: sleeplock1
     release(lk);
