@@ -17,6 +17,7 @@ struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
 
+// pthread_mutex_t lock; // declare a lock
 pthread_mutex_t locks[NBUCKET] = { PTHREAD_MUTEX_INITIALIZER }; // 每个散列桶一把锁
 
 double
@@ -54,8 +55,10 @@ void put(int key, int value)
   } else {
     // the new is new.
     pthread_mutex_lock(&locks[i]);
+    // pthread_mutex_lock(&lock);
     insert(key, value, &table[i], table[i]);
     pthread_mutex_unlock(&locks[i]);
+    // pthread_mutex_unlock(&lock);
   }
 }
 
@@ -106,6 +109,8 @@ main(int argc, char *argv[])
   pthread_t *tha;
   void *value;
   double t1, t0;
+
+  // pthread_mutex_init(&lock, NULL); // initialize the lock
 
   if (argc < 2) {
     fprintf(stderr, "Usage: %s nthreads\n", argv[0]);
