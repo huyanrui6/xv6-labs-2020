@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -96,6 +97,7 @@ allocpid() {
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
+// 在allocproc中将vma数组初始化为全0
 static struct proc*
 allocproc(void)
 {
@@ -133,6 +135,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  // 在allocproc中将vma数组初始化为全0
+  memset(&p->vma, 0, sizeof(p->vma));
 
   return p;
 }
@@ -262,6 +267,7 @@ growproc(int n)
 
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
+// 修改fork，复制父进程的VMA并增加文件引用计数
 int
 fork(void)
 {
@@ -295,6 +301,14 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  // 复制父进程的VMA
+  for(i = 0; i < NVMA; i++) {
+    if(p->vma[i].used) {
+      memmove(&np->vma[i], &p->vma[i], sizeof(p->vma[i]));
+      filedup(p->vma[i].vfile);
+    }
+  }
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -350,6 +364,18 @@ exit(int status)
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    }
+  }
+
+  // 将进程的已映射区域取消映射
+  for(int i = 0; i < NVMA; ++i) {
+    if(p->vma[i].used) {
+      if(p->vma[i].flags == MAP_SHARED && (p->vma[i].prot & PROT_WRITE) != 0) {
+        filewrite(p->vma[i].vfile, p->vma[i].addr, p->vma[i].len);
+      }
+      fileclose(p->vma[i].vfile);
+      uvmunmap(p->pagetable, p->vma[i].addr, p->vma[i].len / PGSIZE, 1);
+      p->vma[i].used = 0;
     }
   }
 
